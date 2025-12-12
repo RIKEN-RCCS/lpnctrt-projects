@@ -1,0 +1,476 @@
+diff -rcN EigenExa-2.4p1-orig/benchmark/Makefile.am EigenExa-2.4p1/benchmark/Makefile.am
+*** EigenExa-2.4p1-orig/benchmark/Makefile.am	2017-03-14 13:34:43.000000000 +0900
+--- EigenExa-2.4p1/benchmark/Makefile.am	2018-01-19 01:14:53.000000000 +0900
+***************
+*** 46,52 ****
+  
+  LIBS = $(top_builddir)/src/libEigenExa.a $(OPT_LD_LAPACK)
+  
+! AM_FFLAGS = $(MACRO_D_PREFIX)TIMER_PRINT=$(OPT_TIMER_PRINT) $(TEST_FLAG) -I$(top_srcdir)/src
+  
+  main2.o : main2.f
+  	$(F77) $(AM_FFLAGS) $(FFLAGS0) -c -o $@ $<
+--- 46,52 ----
+  
+  LIBS = $(top_builddir)/src/libEigenExa.a $(OPT_LD_LAPACK)
+  
+! AM_FFLAGS = $(MACRO_D_PREFIX)TIMER_PRINT=$(OPT_TIMER_PRINT) $(TEST_FLAG) -I$(top_srcdir)/src $(MACRO_MODULE_PATH)$(top_srcdir)/src
+  
+  main2.o : main2.f
+  	$(F77) $(AM_FFLAGS) $(FFLAGS0) -c -o $@ $<
+diff -rcN EigenExa-2.4p1-orig/configure.ac EigenExa-2.4p1/configure.ac
+*** EigenExa-2.4p1-orig/configure.ac	2017-03-20 16:57:40.000000000 +0900
+--- EigenExa-2.4p1/configure.ac	2018-01-19 13:51:24.000000000 +0900
+***************
+*** 76,85 ****
+  AC_SUBST(OPT_TIMER_PRINT)
+  
+  
+  ## fortran compiler
+  #
+  
+! eigenexa_default_fc="mpifrtpx mpixlf90_r sxmpif90 mpif90"
+  
+  # check usablility
+  AC_PROG_F77($eigenexa_default_fc)
+--- 76,103 ----
+  AC_SUBST(OPT_TIMER_PRINT)
+  
+  
++ AC_ARG_ENABLE([avx512],
++     [AS_HELP_STRING(
++       [--enable-avx512],
++       [enable AVX512 features])],
++     [
++       if test x"${enableval}" = x"yes"; then
++ 	    OPT_AVX512=1
++       else
++ 	    OPT_AVX512=0
++       fi
++     ],
++ 	[
++       OPT_AVX512=0
++     ])
++ 
++ AC_SUBST(OPT_AVX512)
++ 
++ 
+  ## fortran compiler
+  #
+  
+! eigenexa_default_fc="mpifrtpx mpiifort mpixlf90_r sxmpif90 mpif90"
+  
+  # check usablility
+  AC_PROG_F77($eigenexa_default_fc)
+***************
+*** 106,118 ****
+    FC_ACT=${F77}
+  fi
+  
+! AC_MSG_RESULT([$FC_ACT])
+  
+  
+  ## C compiler
+  #
+  
+! eigenexa_default_cc="mpifccpx mpixlc_r sxmpic++ mpicc"
+  
+  # check usablility
+  AC_PROG_CC($eigenexa_default_cc)
+--- 124,152 ----
+    FC_ACT=${F77}
+  fi
+  
+! if test x"${FC_ACT}" = x"ifort"; then
+!   fc_ver_info=$(${F77} -E --version)
+!   ICC_VERSION=$(echo ${fc_ver_info} | awk '{ print $3}')
+!   ICC_MAJOR_VERSION=${ICC_VERSION%%.*}
+!   if test ${ICC_MAJOR_VERSION} -ge 15 ; then
+!     OMP="-qopenmp"
+!   else
+!     OMP="-openmp"
+!   fi
+! 
+!   AC_MSG_RESULT([$FC_ACT $ICC_VERSION])
+! 
+! else
+! 
+!   AC_MSG_RESULT([$FC_ACT])
+! 
+! fi
+  
+  
+  ## C compiler
+  #
+  
+! eigenexa_default_cc="mpifccpx mpiicc mpixlc_r sxmpic++ mpicc"
+  
+  # check usablility
+  AC_PROG_CC($eigenexa_default_cc)
+***************
+*** 162,168 ****
+    OPT_LD_LAPACK+="${LAPACK_LIBS}"
+  
+  elif test x"${FC_ACT}" = x"ifort"; then
+!   OPT_LD_LAPACK+="-lscalapack -mkl=parallel"
+  
+  elif test x"${FC_ACT}" = x"gfortran"; then
+    OPT_LD_LAPACK+="-lscalapack"
+--- 196,202 ----
+    OPT_LD_LAPACK+="${LAPACK_LIBS}"
+  
+  elif test x"${FC_ACT}" = x"ifort"; then
+!   OPT_LD_LAPACK+="-I${MKLROOT}/include -L${MKLROOT}/lib/intel64 -lmkl_scalapack_lp64 -lmkl_intel_lp64 -lmkl_intel_thread -lmkl_core -lmkl_blacs_intelmpi_lp64 -liomp5 -lpthread -lm -ldl"
+  
+  elif test x"${FC_ACT}" = x"gfortran"; then
+    OPT_LD_LAPACK+="-lscalapack"
+***************
+*** 191,203 ****
+  else
+  
+    if   test x"${FC_ACT}" = x"ifort"; then
+!     FFLAGS="-openmp -Os -xHOST -fpp -fPIC"
+      
+    elif test x"${FC_ACT}" = x"gfortran"; then
+!     FFLAGS="-fopenmp -O3 -fPIC"
+      
+    elif test x"${FC_ACT}" = x"mpifrtpx"; then
+!     FFLAGS="-Kopenmp -Kfast,ocl,simd,swp -Koptmsg=2 -Cpp -KPIC"
+      
+    elif test x"${FC_ACT}" = x"mpixlf90_r"; then
+      FFLAGS="-qfixed -qsmp=omp -qthreaded -O3 -qessl -qstrict -qarch=qp -qtune=qp -qsimd=auto -qassert=contig -qdirective"
+--- 225,241 ----
+  else
+  
+    if   test x"${FC_ACT}" = x"ifort"; then
+!     if test ${OPT_AVX512} -eq 1 ; then
+!     FFLAGS=${OMP}" -Ofast -axMIC-AVX512 -fpp "
+!     else
+!     FFLAGS=${OMP}" -Ofast -xHOST -fpp "
+!     fi
+      
+    elif test x"${FC_ACT}" = x"gfortran"; then
+!     FFLAGS="-fopenmp -O3"
+      
+    elif test x"${FC_ACT}" = x"mpifrtpx"; then
+!     FFLAGS="-Kopenmp -Kfast,ocl,simd,swp -Koptmsg=2 -Cpp"
+      
+    elif test x"${FC_ACT}" = x"mpixlf90_r"; then
+      FFLAGS="-qfixed -qsmp=omp -qthreaded -O3 -qessl -qstrict -qarch=qp -qtune=qp -qsimd=auto -qassert=contig -qdirective"
+***************
+*** 212,224 ****
+  # FFLAGS0 (special flags)
+  
+  if   test x"${FC_ACT}" = x"ifort"; then
+!   FFLAGS0="-openmp -O0 -fpp -fPIC"
+    
+  elif test x"${FC_ACT}" = x"gfortran"; then
+!   FFLAGS0="-fopenmp -O0 -fPIC"
+    
+  elif test x"${FC_ACT}" = x"mpifrtpx"; then
+!   FFLAGS0="-Kopenmp -Cpp -KPIC"
+    
+  elif test x"${FC_ACT}" = x"mpixlf90_r"; then
+    FFLAGS0="-qfixed -qsmp=omp -qthreaded -O0 -qessl -qstrict"
+--- 250,262 ----
+  # FFLAGS0 (special flags)
+  
+  if   test x"${FC_ACT}" = x"ifort"; then
+!   FFLAGS0=${OMP}" -O0 -fpp"
+    
+  elif test x"${FC_ACT}" = x"gfortran"; then
+!   FFLAGS0="-fopenmp -O0"
+    
+  elif test x"${FC_ACT}" = x"mpifrtpx"; then
+!   FFLAGS0="-Kopenmp -Cpp"
+    
+  elif test x"${FC_ACT}" = x"mpixlf90_r"; then
+    FFLAGS0="-qfixed -qsmp=omp -qthreaded -O0 -qessl -qstrict"
+***************
+*** 238,250 ****
+  else
+  
+    if   test x"${FC_ACT}" = x"ifort"; then
+!     CFLAGS="-openmp -Os -xHOST -fPIC"
+      
+    elif test x"${FC_ACT}" = x"gfortran"; then
+!     CFLAGS="-fopenmp -O3 -fPIC"
+      
+    elif test x"${FC_ACT}" = x"mpifrtpx"; then
+!     CFLAGS="-Kopenmp -Kfast,ocl,simd,swp -Koptmsg=2 -KPIC"
+      
+    elif test x"${FC_ACT}" = x"mpixlf90_r"; then
+      CFLAGS="-qsmp=omp -qthreaded -O3 -qessl -qstrict -qarch=qp -qtune=qp -qsimd=auto -qassert=contig -qdirective"
+--- 276,292 ----
+  else
+  
+    if   test x"${FC_ACT}" = x"ifort"; then
+!     if test ${OPT_AVX512} -eq 1 ; then
+!     CFLAGS=${OMP}" -O3 -axMIC-AVX512 -fpp "
+!     else
+!     CFLAGS=${OMP}" -Os -xHOST -fpp "
+!     fi
+      
+    elif test x"${FC_ACT}" = x"gfortran"; then
+!     CFLAGS="-fopenmp -O3"
+      
+    elif test x"${FC_ACT}" = x"mpifrtpx"; then
+!     CFLAGS="-Kopenmp -Kfast,ocl,simd,swp -Koptmsg=2"
+      
+    elif test x"${FC_ACT}" = x"mpixlf90_r"; then
+      CFLAGS="-qsmp=omp -qthreaded -O3 -qessl -qstrict -qarch=qp -qtune=qp -qsimd=auto -qassert=contig -qdirective"
+***************
+*** 260,272 ****
+  # CFLAGS0 (special flags)
+  
+  if   test x"${FC_ACT}" = x"ifort"; then
+!   CFLAGS0="-openmp -O0 -fPIC"
+    
+  elif test x"${FC_ACT}" = x"gfortran"; then
+!   CFLAGS0="-fopenmp -O0 -fPIC"
+    
+  elif test x"${FC_ACT}" = x"mpifrtpx"; then
+!   CFLAGS0="-Kopenmp -KPIC"
+    
+  elif test x"${FC_ACT}" = x"mpixlf90_r"; then
+    CFLAGS0="-qsmp=omp -qthreaded -O0 -qessl -qstrict"
+--- 302,314 ----
+  # CFLAGS0 (special flags)
+  
+  if   test x"${FC_ACT}" = x"ifort"; then
+!   CFLAGS0=${OMP}" -O0"
+    
+  elif test x"${FC_ACT}" = x"gfortran"; then
+!   CFLAGS0="-fopenmp -O0"
+    
+  elif test x"${FC_ACT}" = x"mpifrtpx"; then
+!   CFLAGS0="-Kopenmp"
+    
+  elif test x"${FC_ACT}" = x"mpixlf90_r"; then
+    CFLAGS0="-qsmp=omp -qthreaded -O0 -qessl -qstrict"
+***************
+*** 282,288 ****
+  # LDFLAGS
+  if test -z "${LDFLAGS}"; then
+    if   test x"${FC_ACT}" = x"ifort"; then
+!     LDFLAGS="-openmp"
+    
+    elif test x"${FC_ACT}" = x"gfortran"; then
+      LDFLAGS="-fopenmp"
+--- 324,330 ----
+  # LDFLAGS
+  if test -z "${LDFLAGS}"; then
+    if   test x"${FC_ACT}" = x"ifort"; then
+!     LDFLAGS=${OMP}" "
+    
+    elif test x"${FC_ACT}" = x"gfortran"; then
+      LDFLAGS="-fopenmp"
+***************
+*** 365,370 ****
+--- 407,456 ----
+  AC_SUBST(MACRO_D_PREFIX)
+  
+  
++ # Macro "-fPIC"
++ 
++ if   test x"${FC_ACT}" = x"ifort"; then
++   MACRO_PIC="-fPIC"
++ 
++ elif test x"${FC_ACT}" = x"gfortran"; then
++   MACRO_PIC="-fPIC"
++ 
++ elif test x"${FC_ACT}" = x"mpifrtpx"; then
++   MACRO_PIC="-KPIC"
++ 
++ elif test x"${FC_ACT}" = x"mpixlf90_r"; then
++   MACRO_PIC=""
++ 
++ elif test x"${FC_ACT}" = x"sxmpif90"; then
++   MACRO_PIC=""
++ 
++ fi
++ 
++ AC_SUBST(MACRO_PIC)
++ 
++ 
++ # Macro "-module "
++ 
++ if   test x"${FC_ACT}" = x"ifort"; then
++   MACRO_MODULE_PATH="-module "
++ 
++ elif test x"${FC_ACT}" = x"gfortran"; then
++   MACRO_MODULE_PATH="-J"
++ 
++ elif test x"${FC_ACT}" = x"mpifrtpx"; then
++   MACRO_MODULE_PATH="-M"
++ 
++ elif test x"${FC_ACT}" = x"mpixlf90_r"; then
++   MACRO_MODULE_PATH=""
++ 
++ elif test x"${FC_ACT}" = x"sxmpif90"; then
++   MACRO_MODULE_PATH=""
++ 
++ fi
++ 
++ AC_SUBST(MACRO_MODULE_PATH)
++ 
++ 
+  ## setting for sxmpif90 (NEC SX-ACE)
+  
+  if test x"${FC_ACT}" = x"sxmpif90"; then
+diff -rcN EigenExa-2.4p1-orig/src/eigen_sx.F EigenExa-2.4p1/src/eigen_sx.F
+*** EigenExa-2.4p1-orig/src/eigen_sx.F	2017-04-16 10:56:50.000000000 +0900
+--- EigenExa-2.4p1/src/eigen_sx.F	2018-01-19 01:53:21.000000000 +0900
+***************
+*** 196,202 ****
+        s0 = eigen_get_wtime()
+  #endif
+  
+!       if ((mode == 'A' .or. mode == 'X') .and. nvec_ > 0) then
+          e2(0*nme+1:0*nme+N-1) = e(0*nme+2:0*nme+N)
+          e2(0*nme+N) = 0
+          e2(1*nme+1:1*nme+N-2) = e(1*nme+3:1*nme+N)
+--- 196,202 ----
+        s0 = eigen_get_wtime()
+  #endif
+  
+!       if ((mode_ == 'A' .or. mode_ == 'X') .and. nvec_ > 0) then
+          e2(0*nme+1:0*nme+N-1) = e(0*nme+2:0*nme+N)
+          e2(0*nme+N) = 0
+          e2(1*nme+1:1*nme+N-2) = e(1*nme+3:1*nme+N)
+***************
+*** 204,210 ****
+          e2(1*nme+N) = 0
+          w(1:n)=d(1:n)
+          call eigen_dcx(n, nvec_, w, e2, nme, z, ldz, INFO, ret_2)
+!         if (mode == 'X') then
+            call eigen_bisect2(d, e, e(1+nme), w, n, 1)
+          end if
+        end if
+--- 204,210 ----
+          e2(1*nme+N) = 0
+          w(1:n)=d(1:n)
+          call eigen_dcx(n, nvec_, w, e2, nme, z, ldz, INFO, ret_2)
+!         if (mode_ == 'X') then
+            call eigen_bisect2(d, e, e(1+nme), w, n, 1)
+          end if
+        end if
+diff -rcN EigenExa-2.4p1-orig/src/eigen_trd_t6_3.F EigenExa-2.4p1/src/eigen_trd_t6_3.F
+*** EigenExa-2.4p1-orig/src/eigen_trd_t6_3.F	2017-04-15 16:02:59.000000000 +0900
+--- EigenExa-2.4p1/src/eigen_trd_t6_3.F	2018-01-19 01:57:02.000000000 +0900
+***************
+*** 315,339 ****
+  ! otherwise done here.
+  !
+        if (.not. flag_putoff) then
+-         x_pos = eigen_translate_g2l(L, x_nnod,x_inod)
+          if (flag_oncache) then
+!           call datacast_dblx(m0, v_y, v_x, ldv,
+       &                       u_t(1), v_t(1), x_pos, 2)
+          else
+            call datacast_dbl(v_y(1), v_x(1), u_t(1), v_t(1), x_pos, 2)
+          end if
+        end if
+  
+        call eigen_vector_zeropad_x(v_x(1), L)
+-       if (.not. flag_putoff) then
+-       if (flag_oncache) then
+-         do k_1=1,m0
+-           call eigen_vector_zeropad_y(v_y(1+ldv*(k_1-1)), L)
+-         end do
+-       else
+-         call eigen_vector_zeropad_y(v_y(1), L)
+-       end if
+-       end if
+  
+  !$OMP END MASTER
+  
+--- 315,336 ----
+  ! otherwise done here.
+  !
+        if (.not. flag_putoff) then
+          if (flag_oncache) then
+!           l_2 = num_v_done + 1
+!           x_pos = eigen_translate_g2l(L+l_2-1, x_nnod,x_inod)
+!           call datacast_dblx(l_2, v_y, v_x, ldv,
+       &                       u_t(1), v_t(1), x_pos, 2)
++           do k_1=1,l_2
++           call eigen_vector_zeropad_y(v_y(1+ldv*(k_1-1)), L+k_1-1)
++           end do
+          else
++           x_pos = eigen_translate_g2l(L, x_nnod,x_inod)
+            call datacast_dbl(v_y(1), v_x(1), u_t(1), v_t(1), x_pos, 2)
++           call eigen_vector_zeropad_y(v_y(1), L)
+          end if
+        end if
+  
+        call eigen_vector_zeropad_x(v_x(1), L)
+  
+  !$OMP END MASTER
+  
+diff -rcN EigenExa-2.4p1-orig/src/Makefile.am EigenExa-2.4p1/src/Makefile.am
+*** EigenExa-2.4p1-orig/src/Makefile.am	2017-03-20 16:59:02.000000000 +0900
+--- EigenExa-2.4p1/src/Makefile.am	2018-01-19 01:14:42.000000000 +0900
+***************
+*** 96,117 ****
+  	eigen_sx.F \
+  	eigen_s.F
+  
+  libEigenExa_so_SOURCES =
+! libEigenExa.so$(EXEEXT): $(libEigenExa_a_OBJECTS)
+  if !SKIP_SHARED
+! 	$(F77) $(SHARED_LDFLAGS) -o $@ $(libEigenExa_a_OBJECTS)
+  endif
+  
+! CLEANFILES = *.mod
+  
+  DEFS = 
+  
+  EXT_FFLAGS = $(MACRO_D_PREFIX)AT_BCAST_OVERLAP=1 $(MACRO_D_PREFIX)AT_REDUCE_OVERLAP=0 $(MACRO_D_PREFIX)OVERLAP_DECISION_TYPE=3
+  
+! AM_FFLAGS = $(MACRO_D_PREFIX)TIMER_PRINT=$(OPT_TIMER_PRINT)
+  
+  include_HEADERS = eigen_libs_mod.mod eigen_blacs_mod.mod comm_mod.mod
+  
+  trbakwy4.o : trbakwy4.F
+  	$(F77)      $(AM_FFLAGS) $(EXT_FFLAGS) $(FFLAGS) -c -o $@ $<
+  
+--- 96,124 ----
+  	eigen_sx.F \
+  	eigen_s.F
+  
++ libEigenExa_a_OBJECTS_shared = $(libEigenExa_a_OBJECTS:.o=.lo)
++ 
+  libEigenExa_so_SOURCES =
+! libEigenExa.so$(EXEEXT): $(libEigenExa_a_OBJECTS_shared)
+  if !SKIP_SHARED
+! 	$(F77) $(SHARED_LDFLAGS) -o $@ $(libEigenExa_a_OBJECTS_shared)
+  endif
+  
+! CLEANFILES = *.mod *.lo
+  
+  DEFS = 
+  
+  EXT_FFLAGS = $(MACRO_D_PREFIX)AT_BCAST_OVERLAP=1 $(MACRO_D_PREFIX)AT_REDUCE_OVERLAP=0 $(MACRO_D_PREFIX)OVERLAP_DECISION_TYPE=3
+  
+! AM_FFLAGS = $(MACRO_D_PREFIX)TIMER_PRINT=$(OPT_TIMER_PRINT) $(MACRO_MODULE_PATH)./
+  
+  include_HEADERS = eigen_libs_mod.mod eigen_blacs_mod.mod comm_mod.mod
+  
++ if !SKIP_SHARED
++ .F.lo:
++ 	$(AM_V_PPF77)$(PPF77COMPILE) $(MACRO_PIC) -c -o $@ $<
++ endif
++ 
+  trbakwy4.o : trbakwy4.F
+  	$(F77)      $(AM_FFLAGS) $(EXT_FFLAGS) $(FFLAGS) -c -o $@ $<
+  
+***************
+*** 129,131 ****
+--- 136,141 ----
+  
+  miscC.o : miscC.c
+  	$(CC)      $(AM_CFLAGS) $(CFLAGS0) -c -o $@ $<
++ miscC.lo : miscC.c
++ 	$(CC)      $(AM_CFLAGS) $(CFLAGS0) -fPIC -c -o $@ $<
++ 
